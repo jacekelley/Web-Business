@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rubik's Cube Timer</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --bg: #0a0a0f; --surface: #13131a; --surface2: #1c1c28;
+    --accent: #6c63ff; --accent2: #ff6584;
+    --text: #e8e8f0; --muted: #6b6b8a; --green: #00e676;
+    --red: #ff5252; --yellow: #ffd740; --border: #2a2a3d;
+  }
+  body { background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui,sans-serif; height:100vh; overflow:hidden; user-select:none; }
+  #app { display:flex; flex-direction:column; height:100vh; }
+
+  header {
+    display:flex; align-items:center; justify-content:space-between;
+    padding:10px 24px; background:var(--surface);
+    border-bottom:1px solid var(--border); z-index:10; flex-shrink:0;
+  }
+  .logo { font-size:1rem; font-weight:700; color:var(--accent); letter-spacing:1px; }
+  .session-stats { display:flex; gap:20px; }
+  .stat { text-align:center; }
+  .stat-val { font-size:.95rem; font-weight:700; }
+  .stat-lbl { font-size:.6rem; color:var(--muted); text-transform:uppercase; letter-spacing:1px; }
+
+  .main { display:flex; flex:1; overflow:hidden; }
+
+  /* SIDEBAR */
+  .sidebar {
+    width:200px; min-width:200px; background:var(--surface);
+    border-right:1px solid var(--border); display:flex; flex-direction:column; overflow:hidden;
+  }
+  .sidebar-header {
+    padding:10px 14px; font-size:.65rem; font-weight:700; color:var(--muted);
+    text-transform:uppercase; letter-spacing:1px; border-bottom:1px solid var(--border);
+    display:flex; justify-content:space-between; align-items:center; flex-shrink:0;
+  }
+  .clear-btn {
+    background:none; border:1px solid var(--border); color:var(--muted);
+    padding:2px 8px; border-radius:4px; cursor:pointer; font-size:.65rem; transition:all .2s;
+  }
+  .clear-btn:hover { border-color:var(--red); color:var(--red); }
+  .times-list { flex:1; overflow-y:auto; padding:6px; }
+  .times-list::-webkit-scrollbar { width:4px; }
+  .times-list::-webkit-scrollbar-thumb { background:var(--border); border-radius:2px; }
+  .time-entry {
+    display:flex; justify-content:space-between; align-items:center;
+    padding:5px 8px; border-radius:6px; margin-bottom:3px;
+    border:1px solid transparent; transition:background .15s;
+  }
+  .time-entry:hover { background:var(--surface2); border-color:var(--border); }
+  .time-entry.best { border-color:rgba(0,230,118,.3); background:rgba(0,230,118,.05); }
+  .time-entry.worst { border-color:rgba(255,82,82,.2); }
+  .entry-num { font-size:.6rem; color:var(--muted); width:20px; }
+  .entry-time { font-size:.82rem; font-weight:600; font-variant-numeric:tabular-nums; }
+  .entry-time.best { color:var(--green); }
+  .entry-time.worst { color:var(--red); }
+  .entry-del { background:none; border:none; color:var(--muted); cursor:pointer; font-size:.7rem; padding:2px 4px; border-radius:3px; opacity:0; transition:opacity .2s; }
+  .time-entry:hover .entry-del { opacity:1; }
+  .entry-del:hover { color:var(--red); }
+
+  /* CENTER */
+  .center { flex:1; display:flex; flex-direction:column; align-items:center; overflow:hidden; position:relative; }
+
+  /* TOP: scramble */
+  .scramble-area {
+    width:100%; padding:12px 20px 8px; text-align:center;
+    background:var(--surface); border-bottom:1px solid var(--border); flex-shrink:0; z-index:5;
+  }
+  .scramble-label { font-size:.6rem; color:var(--muted); text-transform:uppercase; letter-spacing:1px; margin-bottom:4px; }
+  .scramble-moves { font-size:.95rem; font-weight:600; letter-spacing:2px; line-height:1.7; }
+  .scramble-move { display:inline-block; padding:1px 4px; margin:1px; border-radius:4px; transition:all .3s; }
+  .scramble-move.highlight { background:var(--accent); color:white; }
+  .new-scramble-btn {
+    margin-top:6px; background:none; border:1px solid var(--border); color:var(--muted);
+    padding:3px 12px; border-radius:6px; cursor:pointer; font-size:.7rem; transition:all .2s;
+  }
+  .new-scramble-btn:hover { border-color:var(--accent); color:var(--accent); }
+
+  /* TIMER AREA */
+  .timer-area {
+    flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    position:relative; width:100%;
+  }
+
+  .inspect-ring {
+    position:absolute; width:240px; height:240px; border-radius:50%;
+    border:3px solid var(--border); pointer-events:none; opacity:0; transition:opacity .3s;
+  }
+  .inspect-ring.visible { opacity:1; }
+  .inspect-ring svg { position:absolute; top:0; left:0; transform:rotate(-90deg); }
+  .inspect-progress {
+    stroke-dasharray:722; stroke-dashoffset:722;
+    stroke:var(--yellow); stroke-width:3; fill:none; stroke-linecap:round; transition:stroke .3s;
+  }
+
+  .timer-display {
+    font-size:7rem; font-weight:200; font-variant-numeric:tabular-nums;
+    letter-spacing:-4px; line-height:1; color:var(--text);
+    text-shadow:0 0 60px rgba(108,99,255,.2); transition:color .1s; position:relative; z-index:1;
+  }
+  .timer-display.ready { color:var(--green); text-shadow:0 0 60px rgba(0,230,118,.3); }
+  .timer-display.inspecting { color:var(--yellow); text-shadow:0 0 60px rgba(255,215,64,.3); }
+
+  .last-time-display { font-size:1.1rem; color:var(--muted); margin-top:6px; font-variant-numeric:tabular-nums; min-height:1.5em; }
+  .last-time-display span { color:var(--accent2); font-weight:600; }
+
+  .timer-hint { font-size:.72rem; color:var(--muted); margin-top:8px; letter-spacing:1px; }
+
+  /* Penalty row — sits below hint, always visible space */
+  .penalty-row { display:flex; gap:8px; margin-top:10px; min-height:28px; }
+  .pen-btn {
+    background:var(--surface); border:1px solid var(--border); color:var(--muted);
+    padding:4px 14px; border-radius:6px; cursor:pointer; font-size:.7rem; transition:all .2s;
+    visibility:hidden;
+  }
+  .pen-btn.show { visibility:visible; }
+  .pen-btn:hover { border-color:var(--red); color:var(--red); }
+  .pen-btn.active { background:var(--accent); color:white; border-color:var(--accent); }
+  .pen-btn.active-red { background:var(--red); color:white; border-color:var(--red); }
+
+  /* BOTTOM STRIP */
+  .bottom-strip {
+    display:flex; align-items:flex-end; width:100%;
+    padding:10px 14px; gap:10px; flex-shrink:0; border-top:1px solid var(--border);
+    background:var(--surface);
+  }
+
+  /* Cube net */
+  .cube-net-wrap { flex-shrink:0; }
+  .cube-net-label { font-size:.58rem; color:var(--muted); text-transform:uppercase; letter-spacing:1px; margin-bottom:4px; text-align:center; }
+  #cubeCanvas { display:block; }
+
+  /* Stats */
+  .stats-panel { flex-shrink:0; }
+  .stats-title { font-size:.58rem; color:var(--muted); text-transform:uppercase; letter-spacing:1px; margin-bottom:6px; }
+  .stat-grid { display:grid; grid-template-columns:1fr 1fr; gap:4px 16px; }
+  .stat-row { display:flex; justify-content:space-between; gap:8px; }
+  .stat-row-lbl { font-size:.65rem; color:var(--muted); white-space:nowrap; }
+  .stat-row-val { font-size:.72rem; font-weight:700; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .stat-row-val.green { color:var(--green); }
+  .stat-row-val.red { color:var(--red); }
+  .stat-row-val.accent { color:var(--accent); }
+
+  /* AO chips */
+  .ao-chips { display:flex; flex-direction:column; gap:4px; flex-shrink:0; }
+  .ao-chip { background:var(--surface2); border:1px solid var(--border); border-radius:7px; padding:4px 10px; text-align:center; min-width:72px; }
+  .ao-chip-val { font-size:.78rem; font-weight:700; font-variant-numeric:tabular-nums; color:var(--accent); }
+  .ao-chip-lbl { font-size:.55rem; color:var(--muted); text-transform:uppercase; letter-spacing:1px; }
+
+  /* Graph */
+  .graph-wrap { flex:1; min-width:0; }
+  .graph-title { font-size:.58rem; color:var(--muted); text-transform:uppercase; letter-spacing:1px; margin-bottom:4px; }
+  #graph { width:100%; height:80px; display:block; }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="logo">⬛ CUBETIMER</div>
+    <div class="session-stats">
+      <div class="stat"><div class="stat-val" id="hdr-count">0</div><div class="stat-lbl">Solves</div></div>
+      <div class="stat"><div class="stat-val" id="hdr-best">—</div><div class="stat-lbl">Best</div></div>
+      <div class="stat"><div class="stat-val" id="hdr-mean">—</div><div class="stat-lbl">Mean</div></div>
+      <div class="stat"><div class="stat-val" id="hdr-ao5">—</div><div class="stat-lbl">Ao5</div></div>
+      <div class="stat"><div class="stat-val" id="hdr-ao12">—</div><div class="stat-lbl">Ao12</div></div>
+    </div>
+  </header>
+
+  <div class="main">
+    <div class="sidebar">
+      <div class="sidebar-header">
+        Times
+        <button class="clear-btn" id="clearBtn">Clear</button>
+      </div>
+      <div class="times-list" id="timesList"></div>
+    </div>
+
+    <div class="center" id="centerArea">
+      <!-- SCRAMBLE TOP -->
+      <div class="scramble-area">
+        <div class="scramble-label">Scramble</div>
+        <div class="scramble-moves" id="scrambleMoves"></div>
+        <button class="new-scramble-btn" id="newScrambleBtn">↻ New Scramble</button>
+      </div>
+
+      <!-- TIMER MIDDLE -->
+      <div class="timer-area" id="timerArea">
+        <div class="inspect-ring" id="inspectRing">
+          <svg width="240" height="240">
+            <circle class="inspect-progress" id="inspectArc" cx="120" cy="120" r="115"/>
+          </svg>
+        </div>
+        <div class="timer-display" id="timerDisplay">0.00</div>
+        <div class="last-time-display" id="lastTimeDisplay"></div>
+        <div class="timer-hint" id="timerHint">Hold SPACE to inspect</div>
+        <div class="penalty-row" id="penaltyRow">
+          <button class="pen-btn" id="pen-ok">OK</button>
+          <button class="pen-btn" id="pen-plus2">+2</button>
+          <button class="pen-btn" id="pen-dnf">DNF</button>
+        </div>
+      </div>
+
+      <!-- BOTTOM STRIP -->
+      <div class="bottom-strip">
+        <!-- Cube Net -->
+        <div class="cube-net-wrap">
+          <div class="cube-net-label">After Scramble</div>
+          <canvas id="cubeCanvas"></canvas>
+        </div>
+
+        <!-- Stats -->
+        <div class="stats-panel">
+          <div class="stats-title">Session Stats</div>
+          <div class="stat-grid">
+            <div class="stat-row"><span class="stat-row-lbl">Best</span><span class="stat-row-val green" id="s-best">—</span></div>
+            <div class="stat-row"><span class="stat-row-lbl">Worst</span><span class="stat-row-val red" id="s-worst">—</span></div>
+            <div class="stat-row"><span class="stat-row-lbl">Mean</span><span class="stat-row-val accent" id="s-mean">—</span></div>
+            <div class="stat-row"><span class="stat-row-lbl">Std Dev</span><span class="stat-row-val" id="s-std">—</span></div>
+          </div>
+        </div>
+
+        <!-- AO chips -->
+        <div class="ao-chips">
+          <div class="ao-chip"><div class="ao-chip-val" id="ao-ao5">—</div><div class="ao-chip-lbl">Ao5</div></div>
+          <div class="ao-chip"><div class="ao-chip-val" id="ao-ao12">—</div><div class="ao-chip-lbl">Ao12</div></div>
+          <div class="ao-chip"><div class="ao-chip-val" id="ao-ao25">—</div><div class="ao-chip-lbl">Ao25</div></div>
+          <div class="ao-chip"><div class="ao-chip-val" id="ao-ao50">—</div><div class="ao-chip-lbl">Ao50</div></div>
+        </div>
+
+        <!-- Graph -->
+        <div class="graph-wrap">
+          <div class="graph-title">Last 15 Solves</div>
+          <canvas id="graph"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===== SCRAMBLE =====
+const MOVES = ['U','D','L','R','F','B'];
+const MODS = ['', "'", '2'];
+
+function genScramble(len=20) {
+  let moves=[], last=-1, secondLast=-1;
+  for(let i=0;i<len;i++){
+    let face;
+    do { face=Math.floor(Math.random()*6); }
+    while(face===last||(face%2===last%2&&Math.floor(face/2)===Math.floor(last/2)));
+    secondLast=last; last=face;
+    moves.push(MOVES[face]+MODS[Math.floor(Math.random()*3)]);
+  }
+  return moves;
+}
+
+// ===== CUBE STATE =====
+class Cube {
+  constructor(){ this.reset(); }
+  reset(){ this.f=[...Array(6)].map((_,i)=>Array(9).fill(['U','D','L','R','F','B'][i])); }
+  clone(){ const c=new Cube(); c.f=this.f.map(x=>[...x]); return c; }
+  rotateCW(fi){ const f=this.f[fi]; this.f[fi]=[f[6],f[3],f[0],f[7],f[4],f[1],f[8],f[5],f[2]]; }
+  rotateCCW(fi){ this.rotateCW(fi);this.rotateCW(fi);this.rotateCW(fi); }
+  cycle(a,ai,b,bi,c,ci,d,di,cw=true){
+    const g=(face,idx)=>idx.map(i=>this.f[face][i]);
+    const s=(face,idx,v)=>idx.forEach((i,j)=>this.f[face][i]=v[j]);
+    const [av,bv,cv,dv]=[g(a,ai),g(b,bi),g(c,ci),g(d,di)];
+    if(cw){s(a,ai,dv);s(b,bi,av);s(c,ci,bv);s(d,di,cv);}
+    else  {s(a,ai,bv);s(b,bi,cv);s(c,ci,dv);s(d,di,av);}
+  }
+  move(m){
+    const cw=!m.includes("'"), double=m.includes('2'), base=m[0];
+    for(let t=0;t<(double?2:1);t++) this._apply(base,cw);
+  }
+  _apply(b,cw){
+    if(b==='U'){cw?this.rotateCW(0):this.rotateCCW(0);this.cycle(4,[0,1,2],3,[0,1,2],5,[8,7,6],2,[2,1,0],cw);}
+    else if(b==='D'){cw?this.rotateCW(1):this.rotateCCW(1);this.cycle(2,[6,7,8],5,[2,1,0],3,[6,7,8],4,[6,7,8],cw);}
+    else if(b==='L'){cw?this.rotateCW(2):this.rotateCCW(2);this.cycle(0,[0,3,6],4,[0,3,6],1,[0,3,6],5,[8,5,2],cw);}
+    else if(b==='R'){cw?this.rotateCW(3):this.rotateCCW(3);this.cycle(5,[6,3,0],1,[2,5,8],4,[2,5,8],0,[2,5,8],cw);}
+    else if(b==='F'){cw?this.rotateCW(4):this.rotateCCW(4);this.cycle(0,[6,7,8],3,[0,3,6],1,[2,1,0],2,[8,5,2],cw);}
+    else if(b==='B'){cw?this.rotateCW(5):this.rotateCCW(5);this.cycle(2,[0,3,6],1,[6,7,8],3,[8,5,2],0,[2,1,0],cw);}
+  }
+  applyScramble(moves){ moves.forEach(m=>this.move(m)); }
+}
+
+// ===== CUBE NET RENDERER =====
+const FCOLORS = {U:'#f0f0f0',D:'#ffdd00',L:'#ff6000',R:'#dd0000',F:'#00aa44',B:'#1155dd'};
+
+function drawCubeNet(canvas, cube) {
+  // Net layout (col, row) for a standard cross:
+  //      U         col1, row0
+  //   L  F  R  B   col0-3, row1
+  //      D         col1, row2
+  const sz = 11, gap = 1, fd = sz*3+gap*2;
+  const netW = fd*4+gap*3, netH = fd*3+gap*2;
+  canvas.width = netW+4; canvas.height = netH+4;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  const ox=2, oy=2;
+
+  const layout=[
+    {fi:0,col:1,row:0},{fi:1,col:1,row:2},
+    {fi:2,col:0,row:1},{fi:3,col:2,row:1},
+    {fi:4,col:1,row:1},{fi:5,col:3,row:1}
+  ];
+
+  layout.forEach(({fi,col,row})=>{
+    const fx=ox+col*(fd+gap), fy=oy+row*(fd+gap);
+    for(let i=0;i<9;i++){
+      const r=Math.floor(i/3), c=i%3;
+      const x=fx+c*(sz+gap), y=fy+r*(sz+gap);
+      ctx.fillStyle=FCOLORS[cube.f[fi][i]];
+      ctx.fillRect(x,y,sz,sz);
+    }
+    // Face border
+    ctx.strokeStyle='#3a3a5a'; ctx.lineWidth=1.5;
+    ctx.strokeRect(fx-.5,fy-.5,fd+1,fd+1);
+  });
+}
+
+// ===== STATE =====
+let state='idle';
+let startTime=0, elapsed=0, timerInterval=null;
+let inspectInterval=null;
+let spaceDown=false, holdTimeout=null;
+let currentScramble=[];
+let times=[];
+let cube=new Cube();
+
+const timerEl=document.getElementById('timerDisplay');
+const hintEl=document.getElementById('timerHint');
+const lastTimeEl=document.getElementById('lastTimeDisplay');
+const inspectRingEl=document.getElementById('inspectRing');
+const inspectArcEl=document.getElementById('inspectArc');
+const scrambleMovesEl=document.getElementById('scrambleMoves');
+const cubeCanvas=document.getElementById('cubeCanvas');
+const penBtns=document.querySelectorAll('.pen-btn');
+
+function fmt(ms, penalty){
+  if(penalty==='DNF') return 'DNF';
+  if(penalty==='+2') ms+=2000;
+  if(ms<60000){ const s=Math.floor(ms/1000),c=Math.floor((ms%1000)/10); return `${s}.${c.toString().padStart(2,'0')}`; }
+  const m=Math.floor(ms/60000),s=Math.floor((ms%60000)/1000),c=Math.floor((ms%1000)/10);
+  return `${m}:${s.toString().padStart(2,'0')}.${c.toString().padStart(2,'0')}`;
+}
+
+function generateScramble(){
+  currentScramble=genScramble(20);
+  scrambleMovesEl.innerHTML=currentScramble.map((m,i)=>`<span class="scramble-move" id="sm${i}">${m}</span>`).join(' ');
+  cube=new Cube();
+  cube.applyScramble(currentScramble);
+  drawCubeNet(cubeCanvas,cube);
+}
+
+// ===== TIMER =====
+function startInspection(){
+  state='inspecting';
+  const inspectStart=Date.now();
+  timerEl.className='timer-display inspecting';
+  timerEl.textContent='15';
+  hintEl.textContent='Release SPACE to start — Inspection: 15s';
+  inspectRingEl.classList.add('visible');
+  clearInterval(inspectInterval);
+  inspectInterval=setInterval(()=>{
+    const rem=Math.max(0,15-(Date.now()-inspectStart)/1000);
+    const circ=722;
+    inspectArcEl.style.strokeDashoffset=circ*(rem/15);
+    inspectArcEl.style.stroke=rem<=3?'#ff5252':rem<=8?'#ff9800':'#ffd740';
+    timerEl.textContent=Math.ceil(rem);
+    if(rem<=0){ timerEl.textContent='DNF'; clearInterval(inspectInterval); }
+  },50);
+}
+
+function startTimer(){
+  clearInterval(inspectInterval);
+  inspectRingEl.classList.remove('visible');
+  inspectArcEl.style.strokeDashoffset=722;
+  inspectArcEl.style.stroke='#ffd740';
+  state='running';
+  startTime=Date.now();
+  timerEl.className='timer-display running';
+  hintEl.textContent='Press any key to stop';
+  penBtns.forEach(b=>b.classList.remove('show'));
+  timerInterval=setInterval(()=>{ elapsed=Date.now()-startTime; timerEl.textContent=fmt(elapsed,null); },30);
+}
+
+function stopTimer(){
+  clearInterval(timerInterval);
+  elapsed=Date.now()-startTime;
+  state='stopped';
+  timerEl.className='timer-display';
+  timerEl.textContent=fmt(elapsed,null);
+  hintEl.textContent='Hold SPACE to inspect';
+  times.push({raw:elapsed,penalty:null});
+  // Show penalty buttons
+  penBtns.forEach(b=>b.classList.add('show'));
+  document.getElementById('pen-ok').classList.add('active');
+  document.getElementById('pen-plus2').classList.remove('active','active-red');
+  document.getElementById('pen-dnf').classList.remove('active','active-red');
+  lastTimeEl.innerHTML=`Last: <span>${fmt(elapsed,null)}</span>`;
+  updateStats(); renderTimes(); generateScramble();
+}
+
+function applyPenalty(p){
+  if(!times.length) return;
+  const e=times[times.length-1];
+  e.penalty=p==='ok'?null:p;
+  timerEl.textContent=fmt(e.raw,e.penalty);
+  lastTimeEl.innerHTML=`Last: <span>${fmt(e.raw,e.penalty)}</span>`;
+  document.getElementById('pen-ok').classList.toggle('active',p==='ok');
+  document.getElementById('pen-plus2').classList.toggle('active',p==='+2');
+  document.getElementById('pen-dnf').classList.toggle('active-red',p==='DNF');
+  document.getElementById('pen-dnf').classList.toggle('active',false);
+  updateStats(); renderTimes();
+}
+
+// ===== STATS =====
+function getMs(e){ if(e.penalty==='DNF') return Infinity; return e.raw+(e.penalty==='+2'?2000:0); }
+
+function calcAo(n,arr){
+  if(arr.length<n) return null;
+  const sl=arr.slice(-n).map(getMs);
+  if(sl.filter(v=>v===Infinity).length>1) return Infinity;
+  const s=[...sl].sort((a,b)=>a-b).slice(1,n-1);
+  return s.reduce((a,b)=>a+b,0)/s.length;
+}
+
+function updateStats(){
+  const valid=times.filter(t=>t.penalty!=='DNF').map(getMs);
+  const best=valid.length?Math.min(...valid):null;
+  const worst=valid.length?Math.max(...valid):null;
+  const mean=valid.length?valid.reduce((a,b)=>a+b,0)/valid.length:null;
+  const std=valid.length>1?Math.sqrt(valid.map(v=>(v-mean)**2).reduce((a,b)=>a+b)/valid.length):null;
+  const ao5=calcAo(5,times), ao12=calcAo(12,times), ao25=calcAo(25,times), ao50=calcAo(50,times);
+  const f=v=>v===null?'—':v===Infinity?'DNF':fmt(v,null);
+
+  document.getElementById('s-best').textContent=f(best);
+  document.getElementById('s-worst').textContent=f(worst);
+  document.getElementById('s-mean').textContent=f(mean);
+  document.getElementById('s-std').textContent=std!==null?fmt(std,null):'—';
+  document.getElementById('ao-ao5').textContent=f(ao5);
+  document.getElementById('ao-ao12').textContent=f(ao12);
+  document.getElementById('ao-ao25').textContent=f(ao25);
+  document.getElementById('ao-ao50').textContent=f(ao50);
+  document.getElementById('hdr-count').textContent=times.length;
+  document.getElementById('hdr-best').textContent=f(best);
+  document.getElementById('hdr-mean').textContent=f(mean);
+  document.getElementById('hdr-ao5').textContent=f(ao5);
+  document.getElementById('hdr-ao12').textContent=f(ao12);
+  drawGraph();
+}
+
+function renderTimes(){
+  const list=document.getElementById('timesList');
+  const validMs=times.filter(t=>t.penalty!=='DNF').map(getMs);
+  const bestMs=validMs.length?Math.min(...validMs):null;
+  const worstMs=validMs.length&&validMs.length>1?Math.max(...validMs):null;
+  list.innerHTML=times.slice().reverse().map((t,ri)=>{
+    const i=times.length-1-ri;
+    const ms=getMs(t);
+    const isBest=bestMs!==null&&t.penalty!=='DNF'&&ms===bestMs&&validMs.length>1;
+    const isWorst=worstMs!==null&&t.penalty!=='DNF'&&ms===worstMs&&validMs.length>1;
+    return `<div class="time-entry ${isBest?'best':''} ${isWorst?'worst':''}">
+      <span class="entry-num">${i+1}</span>
+      <span class="entry-time ${isBest?'best':''} ${isWorst?'worst':''}">${fmt(t.raw,t.penalty)}</span>
+      <button class="entry-del" onclick="deleteTime(${i})">✕</button>
+    </div>`;
+  }).join('');
+}
+
+function deleteTime(i){ times.splice(i,1); updateStats(); renderTimes(); }
+
+// ===== CLEAR =====
+document.getElementById('clearBtn').onclick=()=>{
+  if(confirm('Clear all times?')){
+    times=[];
+    timerEl.textContent='0.00';
+    timerEl.className='timer-display';
+    lastTimeEl.innerHTML='';
+    penBtns.forEach(b=>{ b.classList.remove('show','active','active-red'); });
+    state='idle';
+    clearInterval(timerInterval); clearInterval(inspectInterval);
+    inspectRingEl.classList.remove('visible');
+    inspectArcEl.style.strokeDashoffset=722;
+    hintEl.textContent='Hold SPACE to inspect';
+    updateStats(); renderTimes();
+  }
+};
+
+// ===== GRAPH =====
+function drawGraph(){
+  const canvas=document.getElementById('graph');
+  const W=canvas.clientWidth||200, H=80;
+  canvas.width=W; canvas.height=H;
+  const ctx=canvas.getContext('2d');
+  ctx.clearRect(0,0,W,H);
+  const recent=times.slice(-15).filter(t=>t.penalty!=='DNF').map(getMs);
+  if(recent.length<2) return;
+  const mn=Math.min(...recent), mx=Math.max(...recent), range=mx-mn||1;
+  const pts=recent.map((v,i)=>({x:8+i*(W-16)/(recent.length-1),y:H-8-(v-mn)/range*(H-16)}));
+  ctx.strokeStyle='#2a2a3d'; ctx.lineWidth=.5;
+  for(let y=0;y<H;y+=20){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+  const grad=ctx.createLinearGradient(0,0,0,H);
+  grad.addColorStop(0,'rgba(108,99,255,.3)'); grad.addColorStop(1,'rgba(108,99,255,0)');
+  ctx.beginPath(); ctx.moveTo(pts[0].x,H);
+  pts.forEach(p=>ctx.lineTo(p.x,p.y)); ctx.lineTo(pts[pts.length-1].x,H);
+  ctx.closePath(); ctx.fillStyle=grad; ctx.fill();
+  ctx.beginPath(); ctx.strokeStyle='#6c63ff'; ctx.lineWidth=2; ctx.lineJoin='round';
+  pts.forEach((p,i)=>i===0?ctx.moveTo(p.x,p.y):ctx.lineTo(p.x,p.y)); ctx.stroke();
+  pts.forEach(p=>{ctx.beginPath();ctx.arc(p.x,p.y,2.5,0,Math.PI*2);ctx.fillStyle='#6c63ff';ctx.fill();});
+}
+
+// ===== INPUT =====
+document.addEventListener('keydown',e=>{
+  if(e.repeat) return;
+  if(state==='running'){ e.preventDefault(); stopTimer(); return; }
+  if(e.code==='Space'){
+    e.preventDefault();
+    if(state==='idle'||state==='stopped'){
+      spaceDown=true;
+      clearTimeout(holdTimeout);
+      startInspection();
+      holdTimeout=setTimeout(()=>{
+        if(spaceDown&&state==='inspecting'){
+          timerEl.className='timer-display ready';
+          timerEl.textContent='0.00';
+          hintEl.textContent='Release SPACE to start';
+          state='ready';
+        }
+      },300);
+    }
+  }
+});
+
+document.addEventListener('keyup',e=>{
+  if(e.code==='Space'){
+    e.preventDefault();
+    spaceDown=false;
+    clearTimeout(holdTimeout);
+    if(state==='inspecting'||state==='ready') startTimer();
+  }
+});
+
+// Touch
+let touchHold=null;
+document.getElementById('timerArea').addEventListener('touchstart',e=>{
+  if(state==='running'){stopTimer();return;}
+  if(state==='idle'||state==='stopped'){
+    startInspection();
+    touchHold=setTimeout(()=>{
+      timerEl.className='timer-display ready';
+      timerEl.textContent='0.00'; state='ready';
+    },300);
+  }
+},{passive:true});
+document.getElementById('timerArea').addEventListener('touchend',()=>{
+  clearTimeout(touchHold);
+  if(state==='inspecting'||state==='ready') startTimer();
+},{passive:true});
+
+document.getElementById('pen-ok').onclick=()=>applyPenalty('ok');
+document.getElementById('pen-plus2').onclick=()=>applyPenalty('+2');
+document.getElementById('pen-dnf').onclick=()=>applyPenalty('DNF');
+document.getElementById('newScrambleBtn').onclick=e=>{e.stopPropagation();if(state!=='running')generateScramble();};
+
+// ===== INIT =====
+generateScramble();
+updateStats();
+</script>
+</body>
+</html>

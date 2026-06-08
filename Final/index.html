@@ -6,7 +6,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Rubik's Cube Timer</title>
   <link rel="stylesheet" href="styles.css">
-
 </head>
 
 <body>
@@ -35,13 +34,17 @@
           <div class="stat-lbl">Ao12</div>
         </div>
       </div>
+      <button class="upgrade-btn" id="upgradeBtn">✦ Upgrade to Pro</button>
     </header>
 
     <div class="main">
       <div class="sidebar">
         <div class="sidebar-header">
           Times
-          <button class="clear-btn" id="clearBtn">Clear</button>
+          <div class="sidebar-header-actions">
+            <button class="export-btn pro-feature" id="exportBtn" title="Export — Pro feature">↓ Export</button>
+            <button class="clear-btn" id="clearBtn">Clear</button>
+          </div>
         </div>
         <div class="times-list" id="timesList"></div>
       </div>
@@ -73,27 +76,18 @@
 
         <!-- BOTTOM STRIP -->
         <div class="bottom-strip">
-          <!-- Cube Net -->
-          <div class="cube-net-wrap">
+          <div class="cube-net-wrap"></div>
 
-          </div>
-
-          <!-- Stats -->
           <div class="stats-panel">
             <div class="stats-title">Session Stats</div>
             <div class="stat-grid">
-              <div class="stat-row"><span class="stat-row-lbl">Best</span><span class="stat-row-val green"
-                  id="s-best">—</span></div>
-              <div class="stat-row"><span class="stat-row-lbl">Worst</span><span class="stat-row-val red"
-                  id="s-worst">—</span></div>
-              <div class="stat-row"><span class="stat-row-lbl">Mean</span><span class="stat-row-val accent"
-                  id="s-mean">—</span></div>
-              <div class="stat-row"><span class="stat-row-lbl">Std Dev</span><span class="stat-row-val"
-                  id="s-std">—</span></div>
+              <div class="stat-row"><span class="stat-row-lbl">Best</span><span class="stat-row-val green" id="s-best">—</span></div>
+              <div class="stat-row"><span class="stat-row-lbl">Worst</span><span class="stat-row-val red" id="s-worst">—</span></div>
+              <div class="stat-row"><span class="stat-row-lbl">Mean</span><span class="stat-row-val accent" id="s-mean">—</span></div>
+              <div class="stat-row"><span class="stat-row-lbl">Std Dev</span><span class="stat-row-val" id="s-std">—</span></div>
             </div>
           </div>
 
-          <!-- AO chips -->
           <div class="ao-chips">
             <div class="ao-chip">
               <div class="ao-chip-val" id="ao-ao5">—</div>
@@ -103,17 +97,16 @@
               <div class="ao-chip-val" id="ao-ao12">—</div>
               <div class="ao-chip-lbl">Ao12</div>
             </div>
-            <div class="ao-chip">
+            <div class="ao-chip pro-feature" id="ao-ao25-chip">
               <div class="ao-chip-val" id="ao-ao25">—</div>
-              <div class="ao-chip-lbl">Ao25</div>
+              <div class="ao-chip-lbl">Ao25 ✦</div>
             </div>
-            <div class="ao-chip">
+            <div class="ao-chip pro-feature" id="ao-ao50-chip">
               <div class="ao-chip-val" id="ao-ao50">—</div>
-              <div class="ao-chip-lbl">Ao50</div>
+              <div class="ao-chip-lbl">Ao50 ✦</div>
             </div>
           </div>
 
-          <!-- Graph -->
           <div class="graph-wrap">
             <div class="graph-title">Last 15 Solves</div>
             <canvas id="graph"></canvas>
@@ -122,6 +115,50 @@
       </div>
     </div>
   </div>
+
+  <!-- PRO UPGRADE MODAL -->
+  <div class="modal-overlay" id="modalOverlay">
+    <div class="modal" id="proModal">
+      <button class="modal-close" id="modalClose">✕</button>
+
+      <div class="modal-header">
+        <div class="modal-badge">✦ PRO</div>
+        <div class="modal-title">Cubing Pro</div>
+        <div class="modal-subtitle">Level up your solving session</div>
+        <div class="modal-price">
+          <span class="price-dollar">$</span>
+          <span class="price-amount">3</span>
+          <span class="price-period">/ month</span>
+        </div>
+      </div>
+
+      <div class="modal-body">
+        <div class="modal-plan-current">
+          <span class="plan-label">Current plan: <strong>Free</strong></span>
+          <span class="plan-badge">Free</span>
+        </div>
+
+        <ul class="feature-list">
+          <li><span class="feat-icon">☁</span><span class="feat-text">Unlimited cloud backups</span></li>
+          <li><span class="feat-icon">📈</span><span class="feat-text">Advanced graphs &amp; analytics</span></li>
+          <li><span class="feat-icon">🎨</span><span class="feat-text">Custom themes</span></li>
+          <li><span class="feat-icon">↓</span><span class="feat-text">Export solve history</span></li>
+          <li><span class="feat-icon">🚀</span><span class="feat-text">Early access to new features</span></li>
+        </ul>
+
+        <button class="modal-cta" id="checkoutBtn">Start free 7-day trial</button>
+        <div class="modal-fine-print">Cancel anytime · No credit card required for trial</div>
+
+        <div class="modal-divider"></div>
+
+        <div class="modal-guarantee">
+          <span class="guarantee-icon">🔒</span>
+          <span>Secure payment · Instant access · Cancel any time</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script src="script.js"></script>
 </body>
 

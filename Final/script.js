@@ -43,6 +43,56 @@ class Cube {
   applyScramble(moves){ moves.forEach(m=>this.move(m)); }
 }
 
+// ===== PRO STATE =====
+// Replace this with real auth/subscription check in production
+let isPro = false;
+
+function openProModal() {
+  document.getElementById('modalOverlay').classList.add('open');
+}
+
+function closeProModal() {
+  document.getElementById('modalOverlay').classList.remove('open');
+}
+
+document.getElementById('upgradeBtn').onclick = openProModal;
+document.getElementById('modalClose').onclick = closeProModal;
+document.getElementById('modalOverlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('modalOverlay')) closeProModal();
+});
+
+document.getElementById('checkoutBtn').onclick = () => {
+  // Wire up your Stripe Checkout URL here, e.g.:
+  // window.open('https://buy.stripe.com/your_link', '_blank');
+  alert('Connect your Stripe Checkout link in script.js → checkoutBtn.onclick');
+};
+
+// Export button — pro-gated
+document.getElementById('exportBtn').onclick = () => {
+  if (!isPro) { openProModal(); return; }
+  exportTimes();
+};
+
+function exportTimes() {
+  if (!times.length) return;
+  const rows = ['#,Time,Penalty,Raw(ms)'];
+  times.forEach((t, i) => {
+    rows.push(`${i+1},${fmt(t.raw, t.penalty)},${t.penalty || 'OK'},${t.raw}`);
+  });
+  const blob = new Blob([rows.join('\n')], { type: 'text/csv' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'cubetimer_solves.csv';
+  a.click();
+}
+
+// Pro chip tooltip on click for non-pro users
+['ao-ao25-chip','ao-ao50-chip'].forEach(id => {
+  document.getElementById(id).addEventListener('click', () => {
+    if (!isPro) openProModal();
+  });
+});
+
 // ===== STATE =====
 let state='idle';
 let startTime=0, elapsed=0, timerInterval=null;
@@ -58,7 +108,6 @@ const lastTimeEl=document.getElementById('lastTimeDisplay');
 const inspectRingEl=document.getElementById('inspectRing');
 const inspectArcEl=document.getElementById('inspectArc');
 const scrambleMovesEl=document.getElementById('scrambleMoves');
-const cubeCanvas=document.getElementById('cubeCanvas');
 const penBtns=document.querySelectorAll('.pen-btn');
 
 function fmt(ms, penalty){
@@ -74,7 +123,6 @@ function generateScramble(){
   scrambleMovesEl.innerHTML=currentScramble.map((m,i)=>`<span class="scramble-move" id="sm${i}">${m}</span>`).join(' ');
   cube=new Cube();
   cube.applyScramble(currentScramble);
-  drawCubeNet(cubeCanvas,cube);
 }
 
 // ===== TIMER =====
@@ -117,7 +165,6 @@ function stopTimer(){
   timerEl.textContent=fmt(elapsed,null);
   hintEl.textContent='Hold SPACE to inspect';
   times.push({raw:elapsed,penalty:null});
-  // Show penalty buttons
   penBtns.forEach(b=>b.classList.add('show'));
   document.getElementById('pen-ok').classList.add('active');
   document.getElementById('pen-plus2').classList.remove('active','active-red');
@@ -163,10 +210,13 @@ function updateStats(){
   document.getElementById('s-worst').textContent=f(worst);
   document.getElementById('s-mean').textContent=f(mean);
   document.getElementById('s-std').textContent=std!==null?fmt(std,null):'—';
+
+  // Ao25/Ao50 only show values for pro users
   document.getElementById('ao-ao5').textContent=f(ao5);
   document.getElementById('ao-ao12').textContent=f(ao12);
-  document.getElementById('ao-ao25').textContent=f(ao25);
-  document.getElementById('ao-ao50').textContent=f(ao50);
+  document.getElementById('ao-ao25').textContent=isPro ? f(ao25) : '✦';
+  document.getElementById('ao-ao50').textContent=isPro ? f(ao50) : '✦';
+
   document.getElementById('hdr-count').textContent=times.length;
   document.getElementById('hdr-best').textContent=f(best);
   document.getElementById('hdr-mean').textContent=f(mean);
@@ -238,6 +288,11 @@ function drawGraph(){
 // ===== INPUT =====
 document.addEventListener('keydown',e=>{
   if(e.repeat) return;
+  // Don't intercept space if the modal is open
+  if(document.getElementById('modalOverlay').classList.contains('open')){
+    if(e.code==='Escape') closeProModal();
+    return;
+  }
   if(state==='running'){ e.preventDefault(); stopTimer(); return; }
   if(e.code==='Space'){
     e.preventDefault();
